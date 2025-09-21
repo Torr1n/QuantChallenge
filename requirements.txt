@@ -1,0 +1,55 @@
+# Core Data Processing
+numpy>=1.24.3
+pandas>=2.0.3
+polars>=0.18.15
+scipy>=1.11.1
+
+# Machine Learning Models
+scikit-learn>=1.3.0
+lightgbm>=4.0.0
+xgboost>=1.7.6
+catboost>=1.2.0  # Optional, for additional diversity
+
+# Deep Learning
+torch>=2.0.1  # CPU version, add +cu118 for CUDA 11.8
+torchvision>=0.15.2  # If needed for any image-based features
+torchaudio>=2.0.2  # If needed for any audio-based features
+
+# Hyperparameter Optimization
+optuna>=3.3.0
+optuna-dashboard>=0.13.0  # Optional, for visualization
+
+# Visualization & Analysis
+matplotlib>=3.7.2
+seaborn>=0.12.2
+plotly>=5.15.0  # Optional, for interactive plots
+
+# Progress Tracking
+tqdm>=4.65.0
+
+# Model Serialization
+joblib>=1.3.1
+dill>=0.3.7  # For complex object serialization
+
+# Validation & Metrics
+imbalanced-learn>=0.11.0  # If dealing with imbalanced targets
+
+# Development Tools
+ipykernel>=6.25.0  # For Jupyter notebook support
+jupyter>=1.0.0
+ipywidgets>=8.1.0
+black>=23.7.0  # Code formatting
+pylint>=2.17.5  # Code quality
+
+# Utilities
+pyyaml>=6.0.1  # For config files
+python-dotenv>=1.0.0  # For environment variables
+click>=8.1.6  # For CLI tools
+
+# Optional: Experiment Tracking
+# mlflow>=2.5.0
+# wandb>=0.15.8
+
+# Optional: Additional Gradient Boosting
+# catboost>=1.2.0
+# interpret>=0.4.4  # For model interpretability
