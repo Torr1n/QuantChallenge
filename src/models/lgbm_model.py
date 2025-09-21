@@ -1,0 +1,301 @@
+"""
+LightGBM Multi-Target Model Implementation
+
+Baseline gradient boosting model with proven parameters from Jane Street analysis.
+"""
+
+import numpy as np
+import pandas as pd
+import lightgbm as lgb
+from typing import Dict, Optional, Tuple, Any
+from sklearn.metrics import r2_score, mean_squared_error
+import warnings
+warnings.filterwarnings('ignore')
+
+
+class LightGBMModel:
+    """
+    LightGBM model with multi-target support for Y1 and Y2 prediction.
+
+    Critical: This is our baseline model - must achieve CV > 0.68 to proceed.
+    """
+
+    def __init__(self, params: Optional[Dict[str, Any]] = None):
+        """
+        Initialize LightGBM model.
+
+        Args:
+            params: Model parameters dictionary (uses defaults if None)
+        """
+        self.default_params = {
+            'objective': 'regression',
+            'n_estimators': 300,
+            'max_depth': 6,
+            'learning_rate': 0.03,
+            'subsample': 0.7,
+            'colsample_bytree': 0.7,
+            'reg_alpha': 0.1,
+            'reg_lambda': 1.0,
+            'min_child_samples': 50,
+            'num_leaves': 31,
+            'random_state': 42,
+            'n_jobs': -1,
+            'verbose': -1,
+            'metric': 'rmse'
+        }
+
+        self.params = params if params is not None else self.default_params
+        self.models = {}  # Separate model for each target
+        self.feature_importance = {}
+        self.train_scores = {}
+        self.val_scores = {}
+
+    def fit(self, X_train: pd.DataFrame, y_train: pd.DataFrame,
+            X_val: Optional[pd.DataFrame] = None, y_val: Optional[pd.DataFrame] = None,
+            early_stopping_rounds: int = 10):
+        """
+        Fit separate LightGBM models for Y1 and Y2.
+
+        Args:
+            X_train: Training features
+            y_train: Training targets (DataFrame with Y1 and Y2 columns)
+            X_val: Validation features (optional)
+            y_val: Validation targets (optional)
+            early_stopping_rounds: Rounds for early stopping
+
+        Returns:
+            Self for chaining
+        """
+        # Ensure we have Y1 and Y2 columns
+        if not all(col in y_train.columns for col in ['Y1', 'Y2']):
+            raise ValueError("y_train must contain columns 'Y1' and 'Y2'")
+
+        for target in ['Y1', 'Y2']:
+            print(f"\nTraining LightGBM for {target}...")
+
+            # Prepare target data
+            y_train_target = y_train[target].values
+            y_val_target = y_val[target].values if y_val is not None else None
+
+            # Create LightGBM datasets
+            train_data = lgb.Dataset(X_train, label=y_train_target)
+            valid_data = lgb.Dataset(X_val, label=y_val_target) if X_val is not None else None
+
+            # Set up callbacks
+            callbacks = [lgb.log_evaluation(period=50)]
+            if valid_data is not None:
+                callbacks.append(lgb.early_stopping(early_stopping_rounds))
+
+            # Train model
+            self.models[target] = lgb.train(
+                self.params,
+                train_data,
+                valid_sets=[train_data, valid_data] if valid_data else [train_data],
+                valid_names=['train', 'valid'] if valid_data else ['train'],
+                callbacks=callbacks
+            )
+
+            # Store feature importance
+            self.feature_importance[target] = pd.DataFrame({
+                'feature': X_train.columns,
+                'importance': self.models[target].feature_importance(importance_type='gain')
+            }).sort_values('importance', ascending=False)
+
+            # Calculate training scores
+            train_pred = self.models[target].predict(X_train, num_iteration=self.models[target].best_iteration)
+            self.train_scores[target] = {
+                'r2': r2_score(y_train_target, train_pred),
+                'rmse': np.sqrt(mean_squared_error(y_train_target, train_pred))
+            }
+
+            # Calculate validation scores if validation set provided
+            if X_val is not None:
+                val_pred = self.models[target].predict(X_val, num_iteration=self.models[target].best_iteration)
+                self.val_scores[target] = {
+                    'r2': r2_score(y_val_target, val_pred),
+                    'rmse': np.sqrt(mean_squared_error(y_val_target, val_pred))
+                }
+
+                # Check for overfitting
+                train_val_gap = self.train_scores[target]['r2'] - self.val_scores[target]['r2']
+                if train_val_gap > 0.05:
+                    print(f"⚠️ Warning: Large train-val gap ({train_val_gap:.4f}) for {target}. "
+                          f"Consider adding more regularization!")
+
+                print(f"{target} - Train R²: {self.train_scores[target]['r2']:.4f}, "
+                      f"Val R²: {self.val_scores[target]['r2']:.4f}")
+
+        return self
+
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        """
+        Generate predictions for both Y1 and Y2.
+
+        Args:
+            X: Features DataFrame
+
+        Returns:
+            Array of shape (n_samples, 2) with Y1 and Y2 predictions
+        """
+        if not self.models:
+            raise ValueError("Models not fitted yet! Call fit() first.")
+
+        predictions = np.zeros((len(X), 2))
+
+        for i, target in enumerate(['Y1', 'Y2']):
+            predictions[:, i] = self.models[target].predict(
+                X,
+                num_iteration=self.models[target].best_iteration
+            )
+
+        return predictions
+
+    def get_weighted_r2_score(self, y_true: pd.DataFrame, y_pred: np.ndarray) -> float:
+        """
+        Calculate weighted R² score for both targets.
+
+        Args:
+            y_true: True values (DataFrame with Y1 and Y2)
+            y_pred: Predicted values (array with 2 columns)
+
+        Returns:
+            Weighted R² score
+        """
+        r2_y1 = r2_score(y_true['Y1'], y_pred[:, 0])
+        r2_y2 = r2_score(y_true['Y2'], y_pred[:, 1])
+
+        # Equal weighting for now, can be adjusted
+        weighted_r2 = (r2_y1 + r2_y2) / 2
+
+        return weighted_r2
+
+    def get_feature_importance_summary(self, top_n: int = 20) -> pd.DataFrame:
+        """
+        Get aggregated feature importance across both targets.
+
+        Args:
+            top_n: Number of top features to return
+
+        Returns:
+            DataFrame with feature importance summary
+        """
+        if not self.feature_importance:
+            raise ValueError("No feature importance available. Fit the model first!")
+
+        # Aggregate importance across targets
+        importance_y1 = self.feature_importance['Y1'].set_index('feature')['importance']
+        importance_y2 = self.feature_importance['Y2'].set_index('feature')['importance']
+
+        avg_importance = (importance_y1 + importance_y2) / 2
+        importance_df = pd.DataFrame({
+            'feature': avg_importance.index,
+            'avg_importance': avg_importance.values,
+            'importance_y1': importance_y1.values,
+            'importance_y2': importance_y2.values
+        }).sort_values('avg_importance', ascending=False)
+
+        # Add cumulative importance
+        importance_df['cumulative_importance'] = importance_df['avg_importance'].cumsum()
+        total_importance = importance_df['avg_importance'].sum()
+        importance_df['cumulative_percent'] = importance_df['cumulative_importance'] / total_importance
+
+        print(f"\nTop {min(top_n, len(importance_df))} features by average importance:")
+        for idx, row in importance_df.head(top_n).iterrows():
+            print(f"  {row['feature']}: {row['avg_importance']:.2f} "
+                  f"(cumulative: {row['cumulative_percent']:.1%})")
+
+        return importance_df.head(top_n)
+
+    def save_models(self, path_prefix: str):
+        """
+        Save trained models to disk.
+
+        Args:
+            path_prefix: Path prefix for saving models
+        """
+        for target, model in self.models.items():
+            model_path = f"{path_prefix}_lgbm_{target.lower()}.txt"
+            model.save_model(model_path)
+            print(f"Saved {target} model to {model_path}")
+
+    def load_models(self, path_prefix: str):
+        """
+        Load trained models from disk.
+
+        Args:
+            path_prefix: Path prefix for loading models
+        """
+        for target in ['Y1', 'Y2']:
+            model_path = f"{path_prefix}_lgbm_{target.lower()}.txt"
+            self.models[target] = lgb.Booster(model_file=model_path)
+            print(f"Loaded {target} model from {model_path}")
+
+    def cross_validate(self, X: pd.DataFrame, y: pd.DataFrame, cv) -> Dict[str, float]:
+        """
+        Perform cross-validation and return scores.
+
+        Args:
+            X: Features DataFrame
+            y: Targets DataFrame
+            cv: Cross-validation splitter (e.g., PurgedTimeSeriesCV)
+
+        Returns:
+            Dictionary with CV scores
+        """
+        cv_scores = {'Y1': [], 'Y2': [], 'weighted': []}
+        oof_predictions = np.zeros((len(X), 2))
+
+        for fold_idx, (train_idx, val_idx) in enumerate(cv.split(X, y)):
+            print(f"\n{'='*50}")
+            print(f"Fold {fold_idx + 1}/{cv.get_n_splits()}")
+            print(f"{'='*50}")
+
+            # Split data
+            X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
+            y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+
+            # Train model
+            self.fit(X_train, y_train, X_val, y_val)
+
+            # Generate predictions
+            val_pred = self.predict(X_val)
+            oof_predictions[val_idx] = val_pred
+
+            # Calculate scores
+            r2_y1 = r2_score(y_val['Y1'], val_pred[:, 0])
+            r2_y2 = r2_score(y_val['Y2'], val_pred[:, 1])
+            weighted_r2 = self.get_weighted_r2_score(y_val, val_pred)
+
+            cv_scores['Y1'].append(r2_y1)
+            cv_scores['Y2'].append(r2_y2)
+            cv_scores['weighted'].append(weighted_r2)
+
+            print(f"Fold {fold_idx + 1} Results:")
+            print(f"  Y1 R²: {r2_y1:.4f}")
+            print(f"  Y2 R²: {r2_y2:.4f}")
+            print(f"  Weighted R²: {weighted_r2:.4f}")
+
+        # Calculate average scores
+        avg_scores = {
+            'Y1_mean': np.mean(cv_scores['Y1']),
+            'Y1_std': np.std(cv_scores['Y1']),
+            'Y2_mean': np.mean(cv_scores['Y2']),
+            'Y2_std': np.std(cv_scores['Y2']),
+            'weighted_mean': np.mean(cv_scores['weighted']),
+            'weighted_std': np.std(cv_scores['weighted'])
+        }
+
+        print(f"\n{'='*50}")
+        print("Cross-Validation Summary:")
+        print(f"  Y1: {avg_scores['Y1_mean']:.4f} ± {avg_scores['Y1_std']:.4f}")
+        print(f"  Y2: {avg_scores['Y2_mean']:.4f} ± {avg_scores['Y2_std']:.4f}")
+        print(f"  Weighted: {avg_scores['weighted_mean']:.4f} ± {avg_scores['weighted_std']:.4f}")
+
+        # Check if we meet the minimum threshold
+        if avg_scores['weighted_mean'] < 0.68:
+            print("\n⚠️ Warning: CV score below 0.68 threshold!")
+            print("Consider: More feature engineering, hyperparameter tuning, or checking for data issues.")
+        else:
+            print(f"\n✅ Success: CV score {avg_scores['weighted_mean']:.4f} exceeds 0.68 threshold!")
+
+        return avg_scores, oof_predictions

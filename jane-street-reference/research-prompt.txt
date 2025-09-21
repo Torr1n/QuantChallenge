@@ -1,0 +1,48 @@
+Okay, so what I want you to do here is a deep analysis of the discussion, comments, provided solutions, and tips and tricks from the Jane Street Real-time Market Data Forecasting Kaggle competition.
+
+The reason I want to do this is with the obvious goal of learning and having you synthesize this large amount of information for me. However, I also want to directly apply it to this other quantitative challenge that I'm doing, which is called quantchallenge.org. My idea and understanding is that the techniques that worked best in this Jane Street market data forecasting competition will apply directly to this other quant challenge. In that challenge, we are once again given a test set of math features and need to predict unknown response variables.
+
+Fortunately, because this Jane Street competition is complete, there are specific discussions and code provided from high-placing finishers. So, I don't just want you to do this research for anything and everything that people say. I want it to be directly tied to what people who were successful were doing and why, now that the competition has concluded. What can we learn from that to map it onto our quant challenge work? We should specifically focus on high-placers, their thoughts or suggestions, and even more importantly, their actual submissions.
+
+There are some specific discussions, models, and code provided that I want you to analyze. The most important one, I would say, is the solution write-up from the 8th-place finishers, which I have linked.
+
+Some other good discussions are a comment on experimental design, tips about using neural networks, how good a simple solution can get, and an explanation for why lags may not be helpful. There is also one about what is the key to a successful sequence model. Some other good discussions are just conversations from the high placers on the leaderboard. There are also some interesting notebooks provided that contain code that could be used as insights when we actually go to build up our solution for the quant challenge. The whole idea is to use these resources to give us the best starting hand possible.
+
+I've even provided the full GitHub of the 8th-place finisher, and my plan is to also include this when I move over and use what we're going to create here to initialize a Plotly Dash project and build out our repository. So, the main thing that's important is to go over all these comments, figure out any common themes of things that worked, and how we might want to apply them to our quant challenge.
+
+Our challenge is slightly simpler than this Jane Street competition, with 15 input features and two response variables. So, 15 covariates and two Y variables we're trying to predict, with only roughly 80,000 training examples. This is a weekend-long event, so it's really important that we leverage these insights to evaluate a good plan of attack or path forward for our project data set. The resources are essentially a series of documents that will bootstrap this implementation with a suggested plan of attack and big-picture design recommendations, themes, or topics within the discussion. This will allow us to take this code example, which is the GitHub from the Kaggle Jane Street, our documents, and this GitHub repository. The code in there has the implementation of a neural network and utility functions that we might want to add or take inspiration from.
+
+For my challenge, here is a data snapshot from the csv head:
+<data example>
+time	A	B	C	D	E	F	G	H	I	J	K	L	M	N	Y1	Y2
+0	0.207366349	-0.159950703	-0.634176492	-0.580962125	-0.266504552	0.060173471	-0.47525741	-1.486515689	-0.332593563	-0.671466006	-0.226149037	-0.187623907	-0.780236585	-0.785965152	-0.935901969	-0.310080574
+1	0.188827613	-0.265508226	0.042143226	-0.550441856	-0.132318646	-0.185218633	0.028294955	0.093210161	-0.518138523	-0.251917025	-0.347844553	-0.359068894	-0.161253653	0.020400986	-0.089707057	-0.305373577
+</data example>
+
+<resources>
+You are expected to explore outside of this list, but this list serves as your *mandatory* baseline and basis for the rest of your exploration. Be thorough, your output will serve as input into downstream Claude Code quantchallenge project instances who won't be able to access these resources themselves and will only be able to rely on what you've provided and pre-processed for them in this task. Ultrathink, give your all and don't hold back.
+
+https://quantchallenge.org/ (MY COMPETITION)
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/overview (PREVIOUS JANE STREET COMPETITION)
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/writeups/evgeniia-grigoreva-private-lb-8th-solution
+https://github.com/evgeniavolkova/kagglejanestreet
+https://github.com/will-s-h/quantchallenge-starter/blob/main/research/research_starter.ipynb
+https://www.kaggle.com/code/yuanzhezhou/jane-street-baseline-lgb-xgb-and-catboost
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/code?competitionId=84493&sortBy=commentCount&excludeNonAccessedDatasources=true
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/discussion/556544
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/discussion/556859
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/discussion/556701
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/discussion/556548
+http://kaggle.com/competitions/jane-street-real-time-market-data-forecasting/discussion/556750
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/discussion/556610
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/discussion/556686
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/discussion/556470
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/discussion/556627
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/discussion/556558
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/discussion/556547
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/discussion/555562
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/discussion/556541
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/discussion/551161
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/discussion/550453
+https://www.kaggle.com/competitions/jane-street-real-time-market-data-forecasting/discussion/550849
+</resources>
