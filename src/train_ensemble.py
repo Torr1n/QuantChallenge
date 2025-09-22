@@ -273,23 +273,27 @@ class CompetitionPipeline:
         """
         self.log_progress("Phase 4: Creating Ensemble", "INFO")
 
+        # Convert dictionary of predictions to list for ensemble functions
+        predictions_list = list(self.oof_predictions.values())
+        y_array = y[['Y1', 'Y2']].values  # Convert to numpy array
+
         # Compare ensemble methods
-        comparison_df = compare_ensemble_methods(self.oof_predictions, y)
+        comparison_results = compare_ensemble_methods(predictions_list, y_array)
 
         # Middle averaging ensemble
         self.log_progress("Optimizing middle averaging ensemble", "INFO")
         middle_ens = MiddleAveragingEnsemble()
-        optimal_ratio = middle_ens.optimize_keep_ratio(self.oof_predictions, y)
+        middle_ens.fit(predictions_list, y_array)  # Use fit method
         self.ensemble_models['middle_averaging'] = middle_ens
 
         # Weighted ensemble
         self.log_progress("Optimizing weighted ensemble", "INFO")
         weighted_ens = WeightedEnsemble()
-        weights = weighted_ens.optimize_weights(self.oof_predictions, y)
+        weighted_ens.fit(predictions_list, y_array)  # Use fit method
         self.ensemble_models['weighted'] = weighted_ens
 
         # Calculate final ensemble score
-        final_pred = middle_ens.predict(self.oof_predictions)
+        final_pred = middle_ens.predict(predictions_list)
         from sklearn.metrics import r2_score
         r2_y1 = r2_score(y['Y1'], final_pred[:, 0])
         r2_y2 = r2_score(y['Y2'], final_pred[:, 1])
@@ -359,8 +363,9 @@ class CompetitionPipeline:
             model.fit(X_train_fe, y_train)
             holdout_predictions[model_name] = model.predict(X_holdout_fe)
 
-        # Ensemble predictions
-        ensemble_pred = self.ensemble_models['middle_averaging'].predict(holdout_predictions)
+        # Ensemble predictions - convert dictionary to list
+        holdout_predictions_list = list(holdout_predictions.values())
+        ensemble_pred = self.ensemble_models['middle_averaging'].predict(holdout_predictions_list)
 
         # Calculate scores
         from sklearn.metrics import r2_score

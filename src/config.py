@@ -66,7 +66,8 @@ NN_PARAMS = {
     'epochs': 100,
     'early_stopping_patience': 10,
     'learning_rate': 0.001,
-    'weight_decay': 1e-4
+    'weight_decay': 1e-4,
+    'device': 'cpu'  # Force CPU to avoid CUDA compatibility issues
 }
 
 # Cross-validation parameters
