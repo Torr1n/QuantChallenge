@@ -165,11 +165,10 @@ class FeatureEngineer:
             rolling_features[f'{col}_roll_std'] = rolling_std.fillna(0)
             rolling_features[f'{col}_roll_range'] = (rolling_max - rolling_min).fillna(0)
 
-            # Relative position within rolling window
-            if is_train:
-                rolling_features[f'{col}_roll_zscore'] = (
-                    (X[col] - rolling_mean) / (rolling_std + 1e-8)
-                ).fillna(0)
+            # Relative position within rolling window - create for both train and validation
+            rolling_features[f'{col}_roll_zscore'] = (
+                (X[col] - rolling_mean) / (rolling_std + 1e-8)
+            ).fillna(0)
 
         return rolling_features
 
