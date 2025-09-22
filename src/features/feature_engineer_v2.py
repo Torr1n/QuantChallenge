@@ -226,11 +226,14 @@ class AdvancedFeatureEngineer:
             ).fillna(0)
 
             # Seasonality features (96-unit cycle)
-            if is_train:
-                # Difference from 96 periods ago
+            # Create for both train and validation to maintain feature consistency
+            if len(X) > self.SEASONALITY_PERIOD:
                 rolling_features[f'{col}_seasonal_diff'] = (
                     X[col] - X[col].shift(self.SEASONALITY_PERIOD)
                 ).fillna(0)
+            else:
+                # For validation or small datasets, use 0 as placeholder
+                rolling_features[f'{col}_seasonal_diff'] = 0
 
         # For non-temporal features, just add basic transformations
         for col in self.NON_TEMPORAL_FEATURES:
