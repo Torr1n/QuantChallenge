@@ -41,7 +41,9 @@ class XGBoostModel:
             'tree_method': 'hist',  # Different from LightGBM's method
             'random_state': 42,
             'n_jobs': -1,
-            'verbosity': 0
+            'verbosity': 0,
+            'early_stopping_rounds': 10,  # Moved from fit() method
+            'eval_metric': 'rmse'  # Required for early stopping
         }
 
         self.params = params if params is not None else self.default_params
@@ -51,8 +53,7 @@ class XGBoostModel:
         self.val_scores = {}
 
     def fit(self, X_train: pd.DataFrame, y_train: pd.DataFrame,
-            X_val: Optional[pd.DataFrame] = None, y_val: Optional[pd.DataFrame] = None,
-            early_stopping_rounds: int = 10):
+            X_val: Optional[pd.DataFrame] = None, y_val: Optional[pd.DataFrame] = None):
         """
         Fit separate XGBoost models for Y1 and Y2.
 
@@ -61,7 +62,6 @@ class XGBoostModel:
             y_train: Training targets (DataFrame with Y1 and Y2 columns)
             X_val: Validation features (optional)
             y_val: Validation targets (optional)
-            early_stopping_rounds: Rounds for early stopping
 
         Returns:
             Self for chaining
@@ -92,7 +92,6 @@ class XGBoostModel:
             self.models[target].fit(
                 X_train, y_train_target,
                 eval_set=eval_set,
-                early_stopping_rounds=early_stopping_rounds if X_val is not None else None,
                 verbose=False
             )
 
