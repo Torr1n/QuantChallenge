@@ -29,7 +29,7 @@ class XGBoostModel:
         """
         self.default_params = {
             'objective': 'reg:squarederror',
-            'n_estimators': 250,
+            'n_estimators': 150,  # Reduced to avoid overfitting without early stopping
             'max_depth': 5,  # Shallower than LightGBM for diversity
             'learning_rate': 0.05,
             'subsample': 0.8,  # More aggressive sampling
@@ -41,9 +41,7 @@ class XGBoostModel:
             'tree_method': 'hist',  # Different from LightGBM's method
             'random_state': 42,
             'n_jobs': -1,
-            'verbosity': 0,
-            'early_stopping_rounds': 10,  # Moved from fit() method
-            'eval_metric': 'rmse'  # Required for early stopping
+            'verbosity': 0
         }
 
         self.params = params if params is not None else self.default_params
@@ -88,10 +86,10 @@ class XGBoostModel:
                 eval_set = [(X_train, y_train_target)]
                 eval_names = ['train']
 
-            # Train model
+            # Train model - simplified to avoid parameter issues
             self.models[target].fit(
                 X_train, y_train_target,
-                eval_set=eval_set,
+                eval_set=eval_set if X_val is not None else None,
                 verbose=False
             )
 
@@ -123,9 +121,14 @@ class XGBoostModel:
                     print(f"⚠️ Warning: Large train-val gap ({train_val_gap:.4f}) for {target}. "
                           f"Consider adding more regularization!")
 
+                # Safely handle best_iteration which may not exist
+                if hasattr(self.models[target], 'best_iteration') and self.models[target].best_iteration is not None:
+                    iter_info = f"Best iter: {self.models[target].best_iteration}"
+                else:
+                    iter_info = f"Iterations: {self.models[target].n_estimators}"
+
                 print(f"{target} - Train R²: {self.train_scores[target]['r2']:.4f}, "
-                      f"Val R²: {self.val_scores[target]['r2']:.4f}, "
-                      f"Best iter: {self.models[target].best_iteration}")
+                      f"Val R²: {self.val_scores[target]['r2']:.4f}, {iter_info}")
 
         return self
 
@@ -145,7 +148,8 @@ class XGBoostModel:
         predictions = np.zeros((len(X), 2))
 
         for i, target in enumerate(['Y1', 'Y2']):
-            if hasattr(self.models[target], 'best_iteration'):
+            # Safely handle best_iteration for prediction
+            if hasattr(self.models[target], 'best_iteration') and self.models[target].best_iteration is not None:
                 predictions[:, i] = self.models[target].predict(
                     X,
                     iteration_range=(0, self.models[target].best_iteration + 1)
