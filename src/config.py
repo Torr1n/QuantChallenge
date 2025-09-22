@@ -79,8 +79,15 @@ CV_PARAMS = {
 # Feature engineering parameters
 FE_PARAMS = {
     'n_top_interactions': 35,  # Top interaction features to select
-    'rolling_window': 150,      # Window for rolling statistics
+    'rolling_window': 96,       # CRITICAL: 96-unit seasonality discovered in temporal features
     'min_correlation': 0.1      # Minimum correlation with target for feature selection
+}
+
+# Feature groups based on ACF analysis
+FEATURE_GROUPS = {
+    'non_temporal': ['C', 'E', 'G', 'H', 'J', 'M', 'N'],  # No ACF, correlates with Y1
+    'temporal': ['A', 'B', 'D', 'F', 'I', 'K', 'L'],      # ACF with 96-unit cycle, correlates with Y2
+    'seasonality_period': 96  # Critical discovery: 96-unit periodicity in temporal features
 }
 
 # Ensemble parameters
