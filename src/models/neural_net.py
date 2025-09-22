@@ -94,7 +94,10 @@ class NeuralNetModel:
             'device': 'cuda' if torch.cuda.is_available() else 'cpu'
         }
 
-        self.params = params if params is not None else self.default_params
+        # Merge provided params with defaults to avoid missing keys
+        self.params = self.default_params.copy()
+        if params is not None:
+            self.params.update(params)
         self.model = None
         self.input_dim = None
         self.train_losses = []
