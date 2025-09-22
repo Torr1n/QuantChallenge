@@ -16,11 +16,12 @@ import time
 import json
 import pickle
 import warnings
+from typing import Tuple, Dict, List, Optional
 warnings.filterwarnings('ignore')
 
 from src.config import *
 from src.utils.cross_validation import PurgedTimeSeriesCV
-from src.features.feature_engineer import FeatureEngineer
+from src.features.feature_engineer_v2 import AdvancedFeatureEngineer
 from src.models.lgbm_model import LightGBMModel
 from src.models.xgb_model import XGBoostModel
 from src.models.neural_net import NeuralNetModel
@@ -95,22 +96,24 @@ class CompetitionPipeline:
             X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
             y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
 
-            # Feature engineering
+            # Feature engineering with temporal awareness
             if fold_idx == 0:
-                self.fe = FeatureEngineer(**FE_PARAMS)
-                X_train_fe = self.fe.fit_transform(X_train, y_train)
+                self.fe = AdvancedFeatureEngineer(
+                    n_top_interactions=35,
+                    rolling_window=96,  # Critical: matches seasonality
+                    min_correlation=0.1
+                )
+                X_train_fe = self.fe.fit_transform(X_train, y_train, fold_idx=fold_idx)
+                X_val_fe = self.fe.transform(X_val, fold_idx=fold_idx)
             else:
-                # Re-fit for each fold
-                fe_fold = FeatureEngineer(**FE_PARAMS)
-                X_train_fe = fe_fold.fit_transform(X_train, y_train)
-                X_val_fe = fe_fold.transform(X_val)
-
-                # Use first fold's feature engineer for consistency
-                if fold_idx == 0:
-                    self.fe = fe_fold
-
-            if fold_idx == 0:
-                X_val_fe = self.fe.transform(X_val)
+                # Re-fit for each fold with proper fold index
+                fe_fold = AdvancedFeatureEngineer(
+                    n_top_interactions=35,
+                    rolling_window=96,
+                    min_correlation=0.1
+                )
+                X_train_fe = fe_fold.fit_transform(X_train, y_train, fold_idx=fold_idx)
+                X_val_fe = fe_fold.transform(X_val, fold_idx=fold_idx)
 
             # Train model
             model = LightGBMModel(params=LGBM_PARAMS)
@@ -159,10 +162,14 @@ class CompetitionPipeline:
             X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
             y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
 
-            # Feature engineering
-            fe_fold = FeatureEngineer(**FE_PARAMS)
-            X_train_fe = fe_fold.fit_transform(X_train, y_train)
-            X_val_fe = fe_fold.transform(X_val)
+            # Feature engineering with temporal awareness
+            fe_fold = AdvancedFeatureEngineer(
+                n_top_interactions=35,
+                rolling_window=96,
+                min_correlation=0.1
+            )
+            X_train_fe = fe_fold.fit_transform(X_train, y_train, fold_idx=fold_idx)
+            X_val_fe = fe_fold.transform(X_val, fold_idx=fold_idx)
 
             # Train model
             model = XGBoostModel(params=XGB_PARAMS)
@@ -221,10 +228,14 @@ class CompetitionPipeline:
             X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
             y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
 
-            # Feature engineering
-            fe_fold = FeatureEngineer(**FE_PARAMS)
-            X_train_fe = fe_fold.fit_transform(X_train, y_train)
-            X_val_fe = fe_fold.transform(X_val)
+            # Feature engineering with temporal awareness
+            fe_fold = AdvancedFeatureEngineer(
+                n_top_interactions=35,
+                rolling_window=96,
+                min_correlation=0.1
+            )
+            X_train_fe = fe_fold.fit_transform(X_train, y_train, fold_idx=fold_idx)
+            X_val_fe = fe_fold.transform(X_val, fold_idx=fold_idx)
 
             # Train model
             model = NeuralNetModel(params=NN_PARAMS)
@@ -326,9 +337,13 @@ class CompetitionPipeline:
         holdout_predictions = {}
 
         # Re-fit feature engineer on all training data
-        fe_final = FeatureEngineer(**FE_PARAMS)
-        X_train_fe = fe_final.fit_transform(X_train, y_train)
-        X_holdout_fe = fe_final.transform(X_holdout)
+        fe_final = AdvancedFeatureEngineer(
+            n_top_interactions=35,
+            rolling_window=96,
+            min_correlation=0.1
+        )
+        X_train_fe = fe_final.fit_transform(X_train, y_train, fold_idx=0)
+        X_holdout_fe = fe_final.transform(X_holdout, fold_idx=0)
 
         # Train each model type
         for model_name in self.models.keys():

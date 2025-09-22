@@ -47,6 +47,7 @@ class AdvancedFeatureEngineer:
         self.selected_interactions = None
         self.scaler = None
         self.rolling_stats_buffer = {}  # Store last window of training data
+        self.seasonal_buffer = {}  # Store last 96 samples for seasonal diff
         self.feature_stats = {}
 
     def select_targeted_interactions(self, X: pd.DataFrame, y: pd.DataFrame) -> List[Tuple[str, str]]:
@@ -225,15 +226,47 @@ class AdvancedFeatureEngineer:
                 (X[col] - rolling_mean) / (rolling_std + 1e-8)
             ).fillna(0)
 
-            # Seasonality features (96-unit cycle)
-            # Create for both train and validation to maintain feature consistency
-            if len(X) > self.SEASONALITY_PERIOD:
-                rolling_features[f'{col}_seasonal_diff'] = (
-                    X[col] - X[col].shift(self.SEASONALITY_PERIOD)
-                ).fillna(0)
+            # Seasonality features (96-unit cycle) with proper temporal continuity
+            if is_train:
+                # During training: store last 96 samples and calculate normally
+                if len(X) >= self.SEASONALITY_PERIOD:
+                    self.seasonal_buffer[f'{col}_fold{fold_idx}'] = X[col].iloc[-self.SEASONALITY_PERIOD:].values
+                    rolling_features[f'{col}_seasonal_diff'] = (
+                        X[col] - X[col].shift(self.SEASONALITY_PERIOD)
+                    ).fillna(0)
+                else:
+                    # Not enough data for seasonal diff
+                    rolling_features[f'{col}_seasonal_diff'] = 0
             else:
-                # For validation or small datasets, use 0 as placeholder
-                rolling_features[f'{col}_seasonal_diff'] = 0
+                # During validation: use stored buffer for continuity
+                buffer_key = f'{col}_fold{fold_idx}'
+                if buffer_key in self.seasonal_buffer and len(self.seasonal_buffer[buffer_key]) == self.SEASONALITY_PERIOD:
+                    # Concatenate buffer with validation data
+                    buffer_series = pd.Series(self.seasonal_buffer[buffer_key],
+                                            index=range(-self.SEASONALITY_PERIOD, 0))
+                    val_series = X[col].reset_index(drop=True)
+                    combined = pd.concat([buffer_series, val_series], ignore_index=True)
+
+                    # Calculate seasonal diff on combined data
+                    seasonal_diff_full = combined - combined.shift(self.SEASONALITY_PERIOD)
+
+                    # Take only validation portion (skip the buffer part)
+                    seasonal_diff_values = seasonal_diff_full.iloc[self.SEASONALITY_PERIOD:].values
+                    rolling_features[f'{col}_seasonal_diff'] = seasonal_diff_values
+                else:
+                    # Fallback if buffer not available
+                    rolling_features[f'{col}_seasonal_diff'] = 0
+
+        # Add Fourier features for 96-cycle seasonality (only for temporal features)
+        # These help capture the periodic patterns discovered in ACF analysis
+        if len(self.TEMPORAL_FEATURES) > 0:
+            time_idx = np.arange(len(X))
+            # Primary 96-cycle
+            rolling_features['sin96'] = np.sin(2 * np.pi * time_idx / self.SEASONALITY_PERIOD)
+            rolling_features['cos96'] = np.cos(2 * np.pi * time_idx / self.SEASONALITY_PERIOD)
+            # Harmonics (48 and 192 cycles)
+            rolling_features['sin48'] = np.sin(2 * np.pi * time_idx / 48)
+            rolling_features['cos48'] = np.cos(2 * np.pi * time_idx / 48)
 
         # For non-temporal features, just add basic transformations
         for col in self.NON_TEMPORAL_FEATURES:
